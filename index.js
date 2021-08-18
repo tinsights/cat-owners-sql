@@ -1,3 +1,8 @@
+/*
+|\---/|    /\_/\       /\_/\
+| o_o |   ( o.o )     ( o o )
+ \_^_/     > ^ <       \_^_/
+*/   
 import pg from 'pg';
 const { Client } = pg;
 
@@ -22,33 +27,36 @@ const whenQueryDone = (error, result) => {
     console.log('error', error);
   } else {
     // rows key has the data
-    console.log(result.rows);
+    console.table(result.rows);
   }
-
   // close the connection
   client.end();
 };
 
+
+const [, , operation, ...args] = process.argv;
+
 // write the SQL query
 let sqlQuery;
-switch(process.argv[2]) {
+switch(operation) {
   case('create-owner'): {
-    console.log("creating owner");
-    sqlQuery = `INSERT INTO owners (name) VALUES ('${process.argv[3]}') RETURNING *`;
+    console.log("creating owner", args);
+    sqlQuery = `INSERT INTO owners (name) VALUES ('${args}') RETURNING *`;
     client.query(sqlQuery, whenQueryDone);
-    break
+    break;
   }
   // node index.js <OWNER_ID> <CAT_NAME>
   case('create-cat'): {
-    console.log("creating cat");
-    sqlQuery = `INSERT INTO cats (name, owner_id) VALUES ('${process.argv[3]}', '${process.argv[4]}') RETURNING *`;
-    client.query(sqlQuery, whenQueryDone);
+    console.log("creating cat", args);
+    sqlQuery = `INSERT INTO cats (name, owner_id) VALUES ($1, $2) RETURNING *`;
+    client.query(sqlQuery, args, whenQueryDone);
     break;
   }
   case('cats'): {
     console.log("Querying all cats");
     sqlQuery = 'SELECT * FROM cats';
     client.query(sqlQuery, (error, result) => {
+      console.table(result.rows);
       result.rows.forEach((cat, index) => {
       const ownerQuery = `SELECT name FROM owners WHERE id=${cat.owner_id}`;
       client.query(ownerQuery, (error, ownerResult) => {
@@ -59,6 +67,25 @@ switch(process.argv[2]) {
       })
     })
   break;
+}
+  case('owners'): {
+    console.log("Querying all owners");
+    sqlQuery = 'SELECT * FROM owners';
+    client.query(sqlQuery, (err, result) => {
+      if (err) throw err;
+      console.table(result.rows);
+      result.rows.forEach((owner, index) => {
+        const catQuery = `SELECT * FROM cats WHERE owner_id=${owner.id}`;
+        client.query(catQuery, (err, catResults) => {
+          console.log(`${owner.id} ${owner.name} \n \t -Cats: \n`);
+          catResults.rows.forEach((cat) => {
+            console.log(`\t\t -${cat.name}`)
+          });
+         if (index === result.rows.length - 1) client.end();
+        })
+      })
+    })
+    break;
 }
   default:
     console.log("What saying you?");
