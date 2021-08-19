@@ -84,13 +84,36 @@ switch(operation) {
 }
   case('owners'): {
     console.log("Querying all owners");
-    sqlQuery = `SELECT owners.name as Owner, cats.name as Cat
-                    FROM owners
-                    INNER JOIN cats
-                    ON owners.id = cats.owner_id;`
-    client.query(sqlQuery, whenQueryDone);
+    if (args.length === 0) {
+      sqlQuery = `SELECT owners.name as Owner, cats.name as Cat
+                      FROM owners
+                      INNER JOIN cats
+                      ON owners.id = cats.owner_id;`
+      client.query(sqlQuery, whenQueryDone);
+    }
+    else {
+      console.log('args[0] :>> ', args[0]);
+      console.log(Number.isNaN(Number(args[0])));
+      if (Number.isNaN(Number(args[0]))) {
+        sqlQuery = `SELECT name FROM owners WHERE id IN
+        (SELECT owner_id from cats GROUP BY owner_id HAVING COUNT(owner_id) ${args[0]});`
+      }
+      else {
+        sqlQuery = `SELECT name FROM owners WHERE id IN 
+        (SELECT owner_id from cats GROUP BY owner_id HAVING COUNT(owner_id) = ${args[0]});`
+      }
+      client.query(sqlQuery, whenQueryDone);
+    }
     break;
 }
+  case('other-cats'): {
+    sqlQuery = `SELECT name FROM cats
+                  WHERE owner_id =
+                    (SELECT owner_id FROM cats
+                      WHERE name='${args[0]}')`;
+    client.query(sqlQuery, whenQueryDone);
+    break;
+  }
   default:
     console.log("What saying you?");
     client.end();
