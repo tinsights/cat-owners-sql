@@ -27,7 +27,18 @@ const whenQueryDone = (error, result) => {
     console.log('error', error);
   } else {
     // rows key has the data
+    const output = {}
+    result.rows.forEach((row, index) => {
+      if (output[row.owner]) {
+        output[row.owner].push(row.cat)
+      }
+      else {
+        output[row.owner] = [row.cat];
+      }
+    })
     console.table(result.rows);
+    console.log(output);
+
   }
   // close the connection
   client.end();
@@ -48,7 +59,10 @@ switch(operation) {
   // node index.js <OWNER_ID> <CAT_NAME>
   case('create-cat'): {
     console.log("creating cat", args);
-    sqlQuery = `INSERT INTO cats (name, owner_id) VALUES ($1, $2) RETURNING *`;
+    sqlQuery = `INSERT INTO cats (name, owner_id)
+                  VALUES ($2, 
+                    (SELECT id FROM owners WHERE name=$1))
+                RETURNING *`;
     client.query(sqlQuery, args, whenQueryDone);
     break;
   }
@@ -70,21 +84,11 @@ switch(operation) {
 }
   case('owners'): {
     console.log("Querying all owners");
-    sqlQuery = 'SELECT * FROM owners';
-    client.query(sqlQuery, (err, result) => {
-      if (err) throw err;
-      console.table(result.rows);
-      result.rows.forEach((owner, index) => {
-        const catQuery = `SELECT * FROM cats WHERE owner_id=${owner.id}`;
-        client.query(catQuery, (err, catResults) => {
-          console.log(`${owner.id} ${owner.name} \n \t -Cats: \n`);
-          catResults.rows.forEach((cat) => {
-            console.log(`\t\t -${cat.name}`)
-          });
-         if (index === result.rows.length - 1) client.end();
-        })
-      })
-    })
+    sqlQuery = `SELECT owners.name as Owner, cats.name as Cat
+                    FROM owners
+                    INNER JOIN cats
+                    ON owners.id = cats.owner_id;`
+    client.query(sqlQuery, whenQueryDone);
     break;
 }
   default:
